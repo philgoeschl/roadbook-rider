@@ -10,6 +10,7 @@ import { WaypointCard } from '@/components/WaypointCard';
 import { getBearingToWaypoint, getDistanceToWaypointM, checkProximity } from '@/engine/proximity';
 import { useLocation } from '@/hooks/useLocation';
 import { useOdometer } from '@/hooks/useOdometer';
+import { useStageTimer } from '@/hooks/useStageTimer';
 import { useRouteStore } from '@/store/routeStore';
 import { useSessionStore } from '@/store/sessionStore';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -37,6 +38,11 @@ export default function RideScreen() {
 
   const route = routes.find((r) => r.id === activeSession?.routeId) ?? null;
   const waypoints = route?.waypoints ?? [];
+
+  const { isInStage, elapsedMs: stageElapsedMs } = useStageTimer(
+    waypoints,
+    activeSession?.events ?? [],
+  );
   const currentWaypoint = waypoints[currentWaypointIndex] ?? null;
   const nextWaypoint = waypoints[currentWaypointIndex + 1] ?? null;
 
@@ -171,6 +177,7 @@ export default function RideScreen() {
         bearingToDeg={bearingToDeg}
         distanceUnit={distanceUnit}
         odometerKm={odometerKm}
+        stageElapsedMs={isInStage ? stageElapsedMs : null}
       />
 
       {/* Controls overlay at the bottom */}

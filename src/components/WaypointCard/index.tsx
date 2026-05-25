@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { WaypointSymbol } from '@/components/WaypointSymbol';
 import { Spacing } from '@/constants/theme';
+import { formatStageDuration } from '@/engine/stageTimer';
 import type { Waypoint } from '@/types';
 
 export interface WaypointCardProps {
@@ -15,6 +16,7 @@ export interface WaypointCardProps {
   bearingToDeg: number;        // computed bearing to current waypoint
   distanceUnit: 'km' | 'mi';
   odometerKm: number;
+  stageElapsedMs: number | null; // null when not in a timed stage
 }
 
 export function WaypointCard({
@@ -27,6 +29,7 @@ export function WaypointCard({
   bearingToDeg,
   distanceUnit,
   odometerKm,
+  stageElapsedMs,
 }: WaypointCardProps) {
   const distanceLabel = formatDistance(distanceToCurrentM, distanceUnit);
   const headingLabel = headingDeg !== null ? `${Math.round(headingDeg)}°` : '---';
@@ -44,6 +47,16 @@ export function WaypointCard({
           {distanceLabel} →
         </ThemedText>
       </View>
+
+      {/* Zone 1b — stage timer bar (only when in a timed stage) */}
+      {stageElapsedMs !== null && (
+        <View style={styles.stageBar}>
+          <ThemedText style={styles.stageLabel}>SS</ThemedText>
+          <ThemedText style={styles.stageTime}>
+            {formatStageDuration(stageElapsedMs)}
+          </ThemedText>
+        </View>
+      )}
 
       {/* Zone 2 — symbol */}
       <View style={styles.symbolZone}>
@@ -127,6 +140,30 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: '#ffffff',
     fontWeight: '600',
+  },
+
+  // Zone 1b
+  stageBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.three,
+    paddingVertical: Spacing.two,
+    backgroundColor: '#7c2d00',
+    borderBottomWidth: 1,
+    borderBottomColor: '#a83800',
+  },
+  stageLabel: {
+    fontSize: 13,
+    color: '#f97316',
+    fontWeight: '800',
+    letterSpacing: 2,
+  },
+  stageTime: {
+    fontSize: 22,
+    color: '#fb923c',
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
   },
 
   // Zone 2

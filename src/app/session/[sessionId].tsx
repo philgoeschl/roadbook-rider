@@ -9,6 +9,7 @@ import { WAYPOINT_LABEL } from '@/components/WaypointSymbol';
 import { Spacing, WaypointColors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { sessionRepo } from '@/db/schema';
+import { computeStageStatus, formatStageDuration } from '@/engine/stageTimer';
 import { useRouteStore } from '@/store/routeStore';
 import { useSessionStore } from '@/store/sessionStore';
 import type { Session, Waypoint } from '@/types';
@@ -52,6 +53,8 @@ export default function SessionSummaryScreen() {
     resultMap[event.waypointId] = event.type;
   }
 
+  const { completedStages } = computeStageStatus(route.waypoints, session.events);
+
   async function handleRideAgain() {
     const newSession = await startSession(route!.id);
     router.replace(`/ride/${newSession.id}`);
@@ -80,6 +83,23 @@ export default function SessionSummaryScreen() {
           <ScoreChip count={missed} label="MISSED" color={WaypointColors.missed} />
           <ScoreChip count={skipped} label="SKIPPED" color={WaypointColors.skipped} />
         </View>
+
+        {/* Stage times (only when route has timed stages) */}
+        {completedStages.length > 0 && (
+          <View style={styles.stagesSection}>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.stagesTitle}>
+              STAGE TIMES
+            </ThemedText>
+            {completedStages.map((stage) => (
+              <View key={stage.stageNumber} style={styles.stageRow}>
+                <ThemedText style={styles.stageNumber}>SS {stage.stageNumber}</ThemedText>
+                <ThemedText style={styles.stageDuration}>
+                  {formatStageDuration(stage.durationMs)}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* Per-waypoint list */}
         <FlatList
@@ -211,6 +231,22 @@ const styles = StyleSheet.create({
   },
   scoreCount: { fontSize: 22, fontWeight: '800' },
   scoreLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
+
+  stagesSection: { gap: Spacing.one },
+  stagesTitle: { letterSpacing: 1 },
+  stageRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    borderRadius: Spacing.two,
+    backgroundColor: '#7c2d0022',
+    borderWidth: 1,
+    borderColor: '#a8380033',
+  },
+  stageNumber: { fontSize: 13, fontWeight: '700', letterSpacing: 1, color: '#f97316' },
+  stageDuration: { fontSize: 18, fontWeight: '700', color: '#fb923c', fontVariant: ['tabular-nums'] },
 
   list: { flex: 1 },
   wpRow: {
