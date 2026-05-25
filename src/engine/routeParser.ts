@@ -1,6 +1,15 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import { Platform } from 'react-native';
 import { XMLParser } from 'fast-xml-parser';
 import type { WaypointType } from '@/types';
+
+async function readFileAsString(uri: string): Promise<string> {
+  if (Platform.OS === 'web') {
+    const response = await fetch(uri);
+    return response.text();
+  }
+  return FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.UTF8 });
+}
 
 // Exported for unit testing
 export function parseGpxString(xml: string): { geoJson: GeoJSON.FeatureCollection; name: string } {
@@ -103,7 +112,7 @@ export async function parseRouteFile(
   fileName: string,
 ): Promise<{ geoJson: GeoJSON.FeatureCollection; name: string }> {
   const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
-  const content = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.UTF8 });
+  const content = await readFileAsString(uri);
 
   if (ext === 'gpx') return parseGpxString(content);
   if (ext === 'kml') return parseKmlString(content);
