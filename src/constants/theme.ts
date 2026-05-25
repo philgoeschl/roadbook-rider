@@ -63,3 +63,13 @@ export const Spacing = {
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
+
+export const WaypointColors = {
+  navigation: '#E53E3E',
+  hazard: '#DD6B20',
+  special: '#3182CE',
+  bearing: '#805AD5',
+  passed: '#38A169',
+  missed: '#E53E3E',
+  skipped: '#718096',
+} as const;
