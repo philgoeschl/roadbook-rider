@@ -35,6 +35,7 @@ export const useSettingsStore = create<SettingsState>()(
       triggerRadiusM: 50,
       distanceUnit: 'km',
       theme: 'auto',
+      penaltyPerMissMs: 5 * 60 * 1000, // 5 minutes
       updateSettings: (partial: Partial<AppSettings>) => set((s) => ({ ...s, ...partial })),
     }),
     {

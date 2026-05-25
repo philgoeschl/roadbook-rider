@@ -9,9 +9,11 @@ import { WAYPOINT_LABEL } from '@/components/WaypointSymbol';
 import { Spacing, WaypointColors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { sessionRepo } from '@/db/schema';
+import { computePenalty } from '@/engine/penalty';
 import { computeStageStatus, formatStageDuration } from '@/engine/stageTimer';
 import { useRouteStore } from '@/store/routeStore';
 import { useSessionStore } from '@/store/sessionStore';
+import { useSettingsStore } from '@/store/settingsStore';
 import type { Session, Waypoint } from '@/types';
 
 export default function SessionSummaryScreen() {
@@ -20,6 +22,7 @@ export default function SessionSummaryScreen() {
   const theme = useTheme();
   const { routes } = useRouteStore();
   const startSession = useSessionStore((s) => s.startSession);
+  const { penaltyPerMissMs } = useSettingsStore();
 
   const [session, setSession] = useState<Session | null>(null);
 
@@ -54,6 +57,11 @@ export default function SessionSummaryScreen() {
   }
 
   const { completedStages } = computeStageStatus(route.waypoints, session.events);
+  const { totalPenaltyMs, penalizedMisses } = computePenalty(
+    route.waypoints,
+    session.events,
+    penaltyPerMissMs,
+  );
 
   async function handleRideAgain() {
     const newSession = await startSession(route!.id);
@@ -83,6 +91,18 @@ export default function SessionSummaryScreen() {
           <ScoreChip count={missed} label="MISSED" color={WaypointColors.missed} />
           <ScoreChip count={skipped} label="SKIPPED" color={WaypointColors.skipped} />
         </View>
+
+        {/* Penalty (only when mandatory waypoints were missed) */}
+        {penalizedMisses > 0 && (
+          <View style={styles.penaltyRow}>
+            <ThemedText style={styles.penaltyLabel}>
+              {penalizedMisses} missed checkpoint{penalizedMisses > 1 ? 's' : ''}
+            </ThemedText>
+            <ThemedText style={styles.penaltyValue}>
+              +{formatStageDuration(totalPenaltyMs)}
+            </ThemedText>
+          </View>
+        )}
 
         {/* Stage times (only when route has timed stages) */}
         {completedStages.length > 0 && (
@@ -231,6 +251,20 @@ const styles = StyleSheet.create({
   },
   scoreCount: { fontSize: 22, fontWeight: '800' },
   scoreLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
+
+  penaltyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    borderRadius: Spacing.two,
+    backgroundColor: '#7f1d1d22',
+    borderWidth: 1,
+    borderColor: '#dc262633',
+  },
+  penaltyLabel: { fontSize: 13, fontWeight: '600', color: '#fca5a5' },
+  penaltyValue: { fontSize: 18, fontWeight: '800', color: '#f87171', fontVariant: ['tabular-nums'] },
 
   stagesSection: { gap: Spacing.one },
   stagesTitle: { letterSpacing: 1 },

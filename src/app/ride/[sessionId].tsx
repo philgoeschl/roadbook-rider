@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { WaypointCard } from '@/components/WaypointCard';
 import { getBearingToWaypoint, getDistanceToWaypointM, checkProximity } from '@/engine/proximity';
+import { formatStageDuration } from '@/engine/stageTimer';
 import { useLocation } from '@/hooks/useLocation';
 import { useOdometer } from '@/hooks/useOdometer';
 import { useStageTimer } from '@/hooks/useStageTimer';
@@ -25,7 +26,7 @@ export default function RideScreen() {
   const { routes } = useRouteStore();
   const { activeSession, currentWaypointIndex, recordEvent, advanceWaypoint, endSession, loadSession } =
     useSessionStore();
-  const { triggerRadiusM, distanceUnit } = useSettingsStore();
+  const { triggerRadiusM, distanceUnit, penaltyPerMissMs } = useSettingsStore();
   const { location, heading, permissionStatus, requestPermission } = useLocation();
   const odometerKm = useOdometer(location);
 
@@ -54,6 +55,8 @@ export default function RideScreen() {
   const [distanceToCurrentM, setDistanceToCurrentM] = useState(0);
   const [bearingToDeg, setBearingToDeg] = useState(0);
   const [rideFinished, setRideFinished] = useState(false);
+  const [penaltyAlert, setPenaltyAlert] = useState<string | null>(null);
+  const penaltyAlertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // GPS update loop
   useEffect(() => {
@@ -97,6 +100,14 @@ export default function RideScreen() {
       distM > prevDistanceRef.current + radius * 2
     ) {
       recordEvent(currentWaypoint.id, 'MISSED', coords);
+
+      if (currentWaypoint.mandatory) {
+        const msg = `CHECKPOINT MISSED  +${formatStageDuration(penaltyPerMissMs)}`;
+        setPenaltyAlert(msg);
+        if (penaltyAlertTimerRef.current) clearTimeout(penaltyAlertTimerRef.current);
+        penaltyAlertTimerRef.current = setTimeout(() => setPenaltyAlert(null), 3000);
+      }
+
       advanceWaypoint();
       approachEnteredRef.current = false;
       prevDistanceRef.current = null;
@@ -166,6 +177,13 @@ export default function RideScreen() {
 
   return (
     <View style={styles.rideContainer}>
+      {/* Penalty alert overlay */}
+      {penaltyAlert !== null && (
+        <View style={styles.penaltyAlert} pointerEvents="none">
+          <ThemedText style={styles.penaltyAlertText}>{penaltyAlert}</ThemedText>
+        </View>
+      )}
+
       {/* Full-screen waypoint card */}
       <WaypointCard
         current={currentWaypoint}
@@ -242,6 +260,28 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   pressed: { opacity: 0.7 },
+
+  penaltyAlert: {
+    position: 'absolute',
+    top: 80,
+    left: 16,
+    right: 16,
+    zIndex: 10,
+    backgroundColor: '#7f1d1d',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#dc2626',
+  },
+  penaltyAlertText: {
+    color: '#fca5a5',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textAlign: 'center',
+  },
 
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   permissionContent: {

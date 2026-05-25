@@ -8,9 +8,15 @@ import { useSettingsStore } from '@/store/settingsStore';
 import type { AppSettings } from '@/types';
 
 const RADIUS_OPTIONS = [25, 50, 75, 100, 150, 200] as const;
+const PENALTY_OPTIONS = [
+  { label: '1 min', ms: 1 * 60 * 1000 },
+  { label: '2 min', ms: 2 * 60 * 1000 },
+  { label: '5 min', ms: 5 * 60 * 1000 },
+  { label: '10 min', ms: 10 * 60 * 1000 },
+] as const;
 
 export default function SettingsScreen() {
-  const { triggerRadiusM, distanceUnit, theme, updateSettings } = useSettingsStore();
+  const { triggerRadiusM, distanceUnit, theme, penaltyPerMissMs, updateSettings } = useSettingsStore();
 
   return (
     <ThemedView style={styles.container}>
@@ -41,6 +47,19 @@ export default function SettingsScreen() {
                   label={unit}
                   selected={distanceUnit === unit}
                   onPress={() => updateSettings({ distanceUnit: unit })}
+                />
+              ))}
+            </View>
+          </SettingsRow>
+
+          <SettingsRow label="Penalty per missed checkpoint">
+            <View style={styles.optionRow}>
+              {PENALTY_OPTIONS.map((opt) => (
+                <OptionChip
+                  key={opt.ms}
+                  label={opt.label}
+                  selected={penaltyPerMissMs === opt.ms}
+                  onPress={() => updateSettings({ penaltyPerMissMs: opt.ms })}
                 />
               ))}
             </View>
