@@ -9,6 +9,7 @@ import { ThemedView } from '@/components/themed-view';
 import { WaypointCard } from '@/components/WaypointCard';
 import { getBearingToWaypoint, getDistanceToWaypointM, checkProximity } from '@/engine/proximity';
 import { useLocation } from '@/hooks/useLocation';
+import { useOdometer } from '@/hooks/useOdometer';
 import { useRouteStore } from '@/store/routeStore';
 import { useSessionStore } from '@/store/sessionStore';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -25,6 +26,7 @@ export default function RideScreen() {
     useSessionStore();
   const { triggerRadiusM, distanceUnit } = useSettingsStore();
   const { location, heading, permissionStatus, requestPermission } = useLocation();
+  const odometerKm = useOdometer(location);
 
   // Load session if navigating directly to this screen (e.g. app restart)
   useEffect(() => {
@@ -105,7 +107,7 @@ export default function RideScreen() {
   async function handleFinish() {
     if (rideFinished) return;
     setRideFinished(true);
-    await endSession();
+    await endSession(odometerKm);
     router.replace(`/session/${sessionId}`);
   }
 
@@ -168,6 +170,7 @@ export default function RideScreen() {
         headingDeg={heading}
         bearingToDeg={bearingToDeg}
         distanceUnit={distanceUnit}
+        odometerKm={odometerKm}
       />
 
       {/* Controls overlay at the bottom */}

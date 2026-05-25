@@ -70,7 +70,7 @@ export default function SessionSummaryScreen() {
         {/* Stats row */}
         <View style={styles.statsRow}>
           <StatCell label="TIME" value={durationLabel} />
-          <StatCell label="DISTANCE" value={`${route.totalDistanceKm.toFixed(1)} km`} />
+          <StatCell label="DISTANCE" value={`${session.totalDistanceKm.toFixed(1)} km`} />
           <StatCell label="WAYPOINTS" value={`${route.waypoints.length}`} />
         </View>
 

@@ -14,6 +14,7 @@ export interface WaypointCardProps {
   headingDeg: number | null;   // from GPS, null until first fix
   bearingToDeg: number;        // computed bearing to current waypoint
   distanceUnit: 'km' | 'mi';
+  odometerKm: number;
 }
 
 export function WaypointCard({
@@ -25,10 +26,12 @@ export function WaypointCard({
   headingDeg,
   bearingToDeg,
   distanceUnit,
+  odometerKm,
 }: WaypointCardProps) {
   const distanceLabel = formatDistance(distanceToCurrentM, distanceUnit);
   const headingLabel = headingDeg !== null ? `${Math.round(headingDeg)}°` : '---';
   const bearingLabel = `${Math.round(bearingToDeg)}°`;
+  const odoLabel = formatOdo(odometerKm, distanceUnit);
 
   return (
     <View style={styles.card}>
@@ -53,7 +56,7 @@ export function WaypointCard({
         <View style={styles.compassDivider} />
         <CompassCell icon="🧭" label="BRG" value={bearingLabel} />
         <View style={styles.compassDivider} />
-        <CompassCell icon="📍" label="DIST" value={distanceLabel} />
+        <CompassCell icon="📏" label="ODO" value={odoLabel} />
       </View>
 
       {/* Zone 4 — next waypoint bar */}
@@ -82,6 +85,11 @@ function CompassCell({ icon, label, value }: { icon: string; label: string; valu
       <ThemedText style={styles.compassLabel}>{label}</ThemedText>
     </View>
   );
+}
+
+function formatOdo(km: number, unit: 'km' | 'mi'): string {
+  if (unit === 'mi') return `${(km * 0.621371).toFixed(1)}mi`;
+  return `${km.toFixed(1)}km`;
 }
 
 function formatDistance(distanceM: number, unit: 'km' | 'mi'): string {

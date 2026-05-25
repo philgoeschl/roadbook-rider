@@ -14,7 +14,7 @@ interface SessionState {
     coords: Coordinates,
   ) => Promise<void>;
   advanceWaypoint: () => void;
-  endSession: () => Promise<void>;
+  endSession: (totalDistanceKm?: number) => Promise<void>;
   loadSession: (sessionId: string) => Promise<Session | null>;
 }
 
@@ -72,11 +72,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set((s) => ({ currentWaypointIndex: s.currentWaypointIndex + 1 }));
   },
 
-  endSession: async (): Promise<void> => {
+  endSession: async (totalDistanceKm = 0): Promise<void> => {
     const { activeSession } = get();
     if (!activeSession) return;
 
-    const ended: Session = { ...activeSession, endedAt: Date.now() };
+    const ended: Session = { ...activeSession, endedAt: Date.now(), totalDistanceKm };
     await sessionRepo.updateSession(ended);
     set({ activeSession: ended });
   },
