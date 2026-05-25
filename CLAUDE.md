@@ -8,6 +8,12 @@ RoadbookRider is a React Native (Expo) app that converts GPS routes into rally-r
 
 Full design spec: `docs/ROADBOOK_RIDER_plan.md`
 
+## Expo Version Note
+
+**Read the exact versioned docs before writing any Expo code:** https://docs.expo.dev/versions/v56.0.0/
+
+This project uses **Expo 56** / React Native 0.85 — APIs and package names differ from older versions.
+
 ## Dev Commands
 
 ```bash
@@ -18,8 +24,7 @@ npm run android          # Android emulator/device
 npm run web              # web browser
 npm run build:apk        # local release APK → apk/roadbook-rider-release.apk
 npm run lint             # lint
-npm run lint:fix         # lint + prettier fix
-npm test                 # run unit tests
+npm test                 # run unit tests (jest)
 npm test -- --watch      # watch mode
 npm test -- __tests__/foo.test.ts  # single test file
 ```
@@ -79,13 +84,13 @@ Profiles are defined in `eas.json`:
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | React Native (Expo) with Expo Router |
-| Navigation | React Navigation v6 |
-| Maps | react-native-maps + Mapbox GL |
+| Framework | Expo 56 + React Native 0.85 |
+| Routing | Expo Router (file-based, `src/app/`) |
+| Maps | Mapbox GL (requires `EXPO_PUBLIC_MAPBOX_TOKEN`) |
 | GPS | expo-location |
-| Storage | SQLite via expo-sqlite |
+| Storage | expo-sqlite |
 | Geospatial | Turf.js |
-| State | Zustand (routeStore, sessionStore) |
+| State | Zustand |
 | File Import | GPX / KML / GeoJSON |
 | Offline Maps | Mapbox offline tile packs |
 
@@ -93,32 +98,43 @@ Profiles are defined in `eas.json`:
 
 ### Directory Layout
 
+The template uses a `src/` root for all app code. The `@/*` alias maps to `./src/*`; `@/assets/*` maps to `./assets/*`.
+
 ```
-app/                    # Expo Router screens (file-based routing)
-  (tabs)/               # Tab navigator: Home, My Routes, Settings
-  ride/[sessionId].tsx  # Active ride screen (full-screen waypoint card)
-  route/[routeId].tsx   # Route preview & waypoint editor
 src/
-  engine/               # Pure logic, no UI
-    routeParser.ts      # GPX/KML/GeoJSON → internal Route type
-    waypointGen.ts      # Auto-generates waypoints from route geometry
-    proximity.ts        # GPS proximity detection (triggers waypoint pass/miss)
-    odometer.ts         # Trip computer / odometer
+  app/                    # Expo Router screens (file-based routing)
+    (tabs)/               # Tab navigator: Home, My Routes, Settings
+    ride/[sessionId].tsx  # Active ride screen (full-screen waypoint card)
+    route/[routeId].tsx   # Route preview & waypoint editor
+    _layout.tsx           # Root layout + ThemeProvider
   components/
-    WaypointCard/       # Full-screen high-contrast waypoint card (primary UI)
-    WaypointSymbol/     # SVG renderer for each waypoint type
-    RoadbookScroll/     # Vertical tape-style waypoint list
-    MiniMap/            # Small contextual map overlay
+    WaypointCard/         # Full-screen high-contrast waypoint card (primary UI)
+    WaypointSymbol/       # SVG renderer for each waypoint type
+    RoadbookScroll/       # Vertical tape-style waypoint list
+    MiniMap/              # Small contextual map overlay
+  engine/                 # Pure logic, no UI
+    routeParser.ts        # GPX/KML/GeoJSON → internal Route type
+    waypointGen.ts        # Auto-generates waypoints from route geometry
+    proximity.ts          # GPS proximity detection (triggers waypoint pass/miss)
+    odometer.ts           # Trip computer / odometer
   store/
-    routeStore.ts       # Zustand: loaded routes, active route
-    sessionStore.ts     # Zustand: active session, events, missed waypoints
+    routeStore.ts         # Zustand: loaded routes, active route
+    sessionStore.ts       # Zustand: active session, events, missed waypoints
   db/
-    schema.ts           # SQLite schema for routes and sessions
+    schema.ts             # expo-sqlite schema for routes and sessions
   types/
-    index.ts            # Shared TypeScript interfaces (Route, Waypoint, Session)
+    index.ts              # Shared TypeScript interfaces (Route, Waypoint, Session)
+  constants/
+    theme.ts              # Colors (light/dark), fonts
+  hooks/                  # Custom React hooks
 assets/
-  waypoint-symbols/     # SVG icons for each WaypointType code
+  images/                 # App icons, splash
+  waypoint-symbols/       # SVG icons for each WaypointType code
 ```
+
+### Platform-Specific Files
+
+Expo resolves `.native.tsx` for iOS/Android, `.web.tsx` for web, base `.tsx` as fallback.
 
 ### Core Data Model
 
@@ -172,7 +188,7 @@ For every coordinate triple `[prev, current, next]`:
 
 ### Ride Screen Layout
 
-The ride screen (`app/ride/[sessionId].tsx`) is a full-screen, glove-friendly card:
+The ride screen (`src/app/ride/[sessionId].tsx`) is a full-screen, glove-friendly card:
 
 ```
 ┌─────────────────────────────┐
