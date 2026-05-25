@@ -22,6 +22,14 @@ export const Colors = {
     backgroundSelected: '#2E3135',
     textSecondary: '#B0B4BA',
   },
+  // High-contrast mode for direct sunlight / outdoor use
+  sunlight: {
+    text: '#000000',
+    background: '#FFFFFF',
+    backgroundElement: '#D8D8D8',
+    backgroundSelected: '#B8B8B8',
+    textSecondary: '#222222',
+  },
 } as const;
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;

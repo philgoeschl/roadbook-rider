@@ -69,10 +69,10 @@ export default function SettingsScreen() {
         <SettingsSection title="APPEARANCE">
           <SettingsRow label="Theme">
             <View style={styles.optionRow}>
-              {(['auto', 'light', 'dark'] as AppSettings['theme'][]).map((t) => (
+              {(['auto', 'light', 'dark', 'sunlight'] as AppSettings['theme'][]).map((t) => (
                 <OptionChip
                   key={t}
-                  label={t.charAt(0).toUpperCase() + t.slice(1)}
+                  label={t === 'sunlight' ? 'Sunlight' : t.charAt(0).toUpperCase() + t.slice(1)}
                   selected={theme === t}
                   onPress={() => updateSettings({ theme: t })}
                 />

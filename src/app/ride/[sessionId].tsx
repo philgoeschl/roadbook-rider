@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -13,6 +14,7 @@ import { formatStageDuration } from '@/engine/stageTimer';
 import { useLocation } from '@/hooks/useLocation';
 import { useOdometer } from '@/hooks/useOdometer';
 import { useStageTimer } from '@/hooks/useStageTimer';
+import { useTheme } from '@/hooks/use-theme';
 import { useRouteStore } from '@/store/routeStore';
 import { useSessionStore } from '@/store/sessionStore';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -23,6 +25,7 @@ export default function RideScreen() {
 
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
   const router = useRouter();
+  const theme = useTheme();
 
   const { routes } = useRouteStore();
   const { activeSession, currentWaypointIndex, recordEvent, advanceWaypoint, endSession, loadSession } =
@@ -48,8 +51,6 @@ export default function RideScreen() {
   const currentWaypoint = waypoints[currentWaypointIndex] ?? null;
   const nextWaypoint = waypoints[currentWaypointIndex + 1] ?? null;
 
-  // Track whether rider has entered the approach zone (within 3× radius)
-  // to detect a MISSED waypoint when they exit it without triggering.
   const approachEnteredRef = useRef(false);
   const prevDistanceRef = useRef<number | null>(null);
 
@@ -58,7 +59,9 @@ export default function RideScreen() {
   const rideFinishedRef = useRef(false);
   const [penaltyAlert, setPenaltyAlert] = useState<string | null>(null);
   const [showScroll, setShowScroll] = useState(false);
+  const [showPassFlash, setShowPassFlash] = useState(false);
   const penaltyAlertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const passFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // GPS update loop
   useEffect(() => {
@@ -83,6 +86,12 @@ export default function RideScreen() {
       approachEnteredRef.current = false;
       prevDistanceRef.current = null;
 
+      // Visual + haptic feedback on pass
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowPassFlash(true);
+      if (passFlashTimerRef.current) clearTimeout(passFlashTimerRef.current);
+      passFlashTimerRef.current = setTimeout(() => setShowPassFlash(false), 500);
+
       if (currentWaypointIndex + 1 >= waypoints.length) {
         handleFinish();
       }
@@ -102,6 +111,7 @@ export default function RideScreen() {
       distM > prevDistanceRef.current + radius * 2
     ) {
       recordEvent(currentWaypoint.id, 'MISSED', coords);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
 
       if (currentWaypoint.mandatory) {
         const msg = `CHECKPOINT MISSED  +${formatStageDuration(penaltyPerMissMs)}`;
@@ -126,13 +136,19 @@ export default function RideScreen() {
   async function handleFinish() {
     if (rideFinishedRef.current) return;
     rideFinishedRef.current = true;
-    await endSession(odometerKm);
-    router.replace(`/session/${sessionId}`);
+    try {
+      await endSession(odometerKm);
+      router.replace(`/session/${sessionId}`);
+    } catch {
+      // DB write failed — fall back to home so rider isn't stuck
+      router.replace('/');
+    }
   }
 
   async function handleSkip() {
     if (!currentWaypoint || !location) return;
     const { latitude: lat, longitude: lng } = location.coords;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await recordEvent(currentWaypoint.id, 'SKIPPED', { lat, lng });
     advanceWaypoint();
     approachEnteredRef.current = false;
@@ -144,10 +160,26 @@ export default function RideScreen() {
   }
 
   function handleAbort() {
-    Alert.alert('End Ride', 'Stop the current ride?', [
-      { text: 'Continue', style: 'cancel' },
-      { text: 'End Ride', style: 'destructive', onPress: handleFinish },
-    ]);
+    const passed = activeSession?.events.filter((e) => e.type === 'PASSED').length ?? 0;
+    const total = waypoints.length;
+    Alert.alert(
+      'End Ride',
+      `${passed} of ${total} waypoints passed.`,
+      [
+        { text: 'Continue Riding', style: 'cancel' },
+        {
+          text: 'Go Home',
+          onPress: async () => {
+            if (!rideFinishedRef.current) {
+              rideFinishedRef.current = true;
+              try { await endSession(odometerKm); } catch { /* best-effort */ }
+            }
+            router.replace('/');
+          },
+        },
+        { text: 'See Results', style: 'destructive', onPress: handleFinish },
+      ],
+    );
   }
 
   // Permission wall
@@ -177,8 +209,13 @@ export default function RideScreen() {
     );
   }
 
+  const borderColor = theme.backgroundElement;
+
   return (
-    <View style={styles.rideContainer}>
+    <View style={[styles.rideContainer, { backgroundColor: theme.background }]}>
+      {/* Green flash overlay on waypoint pass */}
+      {showPassFlash && <View style={styles.passFlash} pointerEvents="none" />}
+
       {/* Penalty alert overlay */}
       {penaltyAlert !== null && (
         <View style={styles.penaltyAlert} pointerEvents="none">
@@ -209,20 +246,30 @@ export default function RideScreen() {
         />
       )}
 
-      {/* Controls overlay at the bottom */}
-      <SafeAreaView style={styles.controls} edges={['bottom']}>
-        <Pressable
-          style={({ pressed }) => [styles.scrollToggle, showScroll && styles.scrollToggleActive, pressed && styles.pressed]}
-          onPress={() => setShowScroll((v) => !v)}>
-          <ThemedText style={[styles.scrollToggleText, showScroll && styles.scrollToggleTextActive]}>
-            {showScroll ? 'CARD' : 'SCROLL'}
-          </ThemedText>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.skipButton, pressed && styles.pressed]}
-          onPress={handleSkip}>
-          <ThemedText style={styles.skipText}>SKIP</ThemedText>
-        </Pressable>
+      {/* Controls: two rows — SKIP/SCROLL on top, END RIDE below (separated to prevent accidental taps) */}
+      <SafeAreaView style={[styles.controls, { backgroundColor: theme.background, borderTopColor: borderColor }]} edges={['bottom']}>
+        {/* Row 1 — SKIP + SCROLL TOGGLE */}
+        <View style={styles.controlsRow}>
+          <Pressable
+            style={({ pressed }) => [styles.skipButton, { backgroundColor: theme.backgroundElement }, pressed && styles.pressed]}
+            onPress={handleSkip}>
+            <ThemedText style={styles.skipText}>SKIP</ThemedText>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.scrollToggle,
+              { backgroundColor: theme.backgroundElement },
+              showScroll && styles.scrollToggleActive,
+              pressed && styles.pressed,
+            ]}
+            onPress={() => setShowScroll((v) => !v)}>
+            <ThemedText style={[styles.scrollToggleText, showScroll && styles.scrollToggleTextActive]}>
+              {showScroll ? 'CARD' : 'SCROLL'}
+            </ThemedText>
+          </Pressable>
+        </View>
+
+        {/* Row 2 — END RIDE (full width, clearly distinct) */}
         <Pressable
           style={({ pressed }) => [styles.abortButton, pressed && styles.pressed]}
           onPress={handleAbort}>
@@ -236,19 +283,18 @@ export default function RideScreen() {
 const styles = StyleSheet.create({
   rideContainer: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
   },
   controls: {
-    flexDirection: 'row',
-    gap: 12,
+    gap: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#0a0a0a',
     borderTopWidth: 1,
-    borderTopColor: '#1f1f1f',
+  },
+  controlsRow: {
+    flexDirection: 'row',
+    gap: 12,
   },
   scrollToggle: {
-    backgroundColor: '#1f1f1f',
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 14,
@@ -257,15 +303,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scrollToggleActive: {
-    backgroundColor: '#1a2a1a',
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#38A169',
   },
   scrollToggleText: {
-    color: '#555',
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1.5,
+    color: '#888',
   },
   scrollToggleTextActive: {
     color: '#38A169',
@@ -273,7 +318,6 @@ const styles = StyleSheet.create({
 
   skipButton: {
     flex: 1,
-    backgroundColor: '#1f1f1f',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
@@ -281,27 +325,36 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   skipText: {
-    color: '#888',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
     letterSpacing: 2,
   },
+
   abortButton: {
-    backgroundColor: '#1a0000',
+    backgroundColor: '#C0392B',
     borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    paddingVertical: 18,
     alignItems: 'center',
-    minHeight: 56,
+    minHeight: 60,
     justifyContent: 'center',
   },
   abortText: {
-    color: '#E53E3E',
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 1,
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 2,
   },
   pressed: { opacity: 0.7 },
+
+  passFlash: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(56, 161, 105, 0.35)',
+    zIndex: 5,
+  },
 
   penaltyAlert: {
     position: 'absolute',
@@ -325,13 +378,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   permissionContent: {
     paddingHorizontal: 32,
     gap: 16,
     alignItems: 'center',
   },
-  permissionTitle: { color: '#fff', textAlign: 'center' },
+  permissionTitle: { textAlign: 'center' },
   permissionBody: { textAlign: 'center', lineHeight: 22 },
   permissionButton: {
     backgroundColor: '#3182CE',

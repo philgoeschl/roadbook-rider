@@ -97,6 +97,6 @@ export interface Session {
 export interface AppSettings {
   triggerRadiusM: number;
   distanceUnit: 'km' | 'mi';
-  theme: 'light' | 'dark' | 'auto';
+  theme: 'light' | 'dark' | 'auto' | 'sunlight';
   penaltyPerMissMs: number; // time penalty per missed mandatory waypoint, in ms
 }

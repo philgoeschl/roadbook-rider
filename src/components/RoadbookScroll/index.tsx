@@ -3,6 +3,7 @@ import { FlatList, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { WaypointColors, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import type { SessionEvent, Waypoint, WaypointType } from '@/types';
 
 export interface RoadbookScrollProps {
@@ -72,6 +73,7 @@ export function RoadbookScroll({
   events,
   distanceUnit,
 }: RoadbookScrollProps) {
+  const theme = useTheme();
   const listRef = useRef<FlatList<RowItem>>(null);
 
   const resultMap = new Map<string, EventResult>();
@@ -83,10 +85,15 @@ export function RoadbookScroll({
     result: resultMap.get(wp.id) ?? null,
   }));
 
-  useEffect(() => {
+  function scrollToCurrent(animated: boolean) {
     if (waypoints.length === 0) return;
     const index = Math.min(currentIndex, waypoints.length - 1);
-    listRef.current?.scrollToIndex({ index, viewPosition: 0.35, animated: true });
+    listRef.current?.scrollToIndex({ index, viewPosition: 0.35, animated });
+  }
+
+  // Scroll when the current waypoint advances during a ride
+  useEffect(() => {
+    scrollToCurrent(true);
   }, [currentIndex, waypoints.length]);
 
   return (
@@ -94,14 +101,17 @@ export function RoadbookScroll({
       ref={listRef}
       data={data}
       keyExtractor={(item) => item.waypoint.id}
-      style={styles.list}
+      style={[styles.list, { backgroundColor: theme.background }]}
       contentContainerStyle={styles.content}
-      renderItem={({ item }) => <ScrollRow item={item} distanceUnit={distanceUnit} />}
+      renderItem={({ item }) => (
+        <ScrollRow item={item} distanceUnit={distanceUnit} />
+      )}
+      // Scroll to current immediately once the list is laid out (handles fresh mount on view switch)
+      onLayout={() => scrollToCurrent(false)}
       onScrollToIndexFailed={({ index }) => {
-        // Retry after layout
         setTimeout(() => {
           listRef.current?.scrollToIndex({ index, viewPosition: 0.35, animated: false });
-        }, 100);
+        }, 150);
       }}
     />
   );
@@ -114,40 +124,44 @@ function ScrollRow({
   item: RowItem;
   distanceUnit: 'km' | 'mi';
 }) {
+  const theme = useTheme();
   const color = typeColor(wp.type);
   const isCurrent = state === 'current';
   const isPast = state === 'past';
 
+  // Past rows: use result color for the circle so it's immediately readable (✓ green / ✗ red)
+  const circleColor = isPast && result ? RESULT_COLOR[result] : color;
+  const rowBg = isCurrent ? theme.backgroundElement : 'transparent';
+  const borderColor = theme.backgroundElement;
+
   return (
-    <View style={[styles.row, isCurrent && styles.rowCurrent, isPast && styles.rowPast]}>
+    <View style={[styles.row, { borderBottomColor: borderColor, backgroundColor: rowBg }]}>
       {/* Current indicator stripe */}
       <View style={[styles.stripe, { backgroundColor: isCurrent ? color : 'transparent' }]} />
 
       {/* Index */}
-      <ThemedText style={[styles.index, isPast && styles.dimText]}>
+      <ThemedText style={[styles.index, { color: isPast ? theme.textSecondary : theme.textSecondary }]}>
         {wp.index + 1}
       </ThemedText>
 
       {/* Symbol circle */}
-      <View
-        style={[
-          styles.circle,
-          { backgroundColor: isPast ? '#333' : color },
-        ]}>
-        <ThemedText style={styles.glyph}>{GLYPH[wp.type]}</ThemedText>
+      <View style={[styles.circle, { backgroundColor: circleColor }]}>
+        <ThemedText style={styles.glyph}>
+          {isPast && result ? RESULT_ICON[result] : GLYPH[wp.type]}
+        </ThemedText>
       </View>
 
       {/* Type + label */}
       <View style={styles.labelCol}>
-        <ThemedText
-          style={[
-            styles.typeCode,
-            { color: isPast ? '#555' : color },
-          ]}>
+        <ThemedText style={[styles.typeCode, { color: isPast ? theme.textSecondary : color }]}>
           {wp.type}
         </ThemedText>
         <ThemedText
-          style={[styles.labelText, isCurrent && styles.labelCurrent, isPast && styles.dimText]}
+          style={[
+            styles.labelText,
+            { color: isCurrent ? theme.text : theme.textSecondary },
+            isCurrent && styles.labelCurrent,
+          ]}
           numberOfLines={1}>
           {LABEL[wp.type]}
           {wp.mandatory ? '  ·  CP' : ''}
@@ -155,14 +169,14 @@ function ScrollRow({
       </View>
 
       {/* Distance from previous */}
-      <ThemedText style={[styles.dist, isPast && styles.dimText]}>
+      <ThemedText style={[styles.dist, { color: theme.textSecondary }]}>
         {formatDist(wp.distanceFromPrev, distanceUnit)}
       </ThemedText>
 
-      {/* Result icon for past waypoints */}
+      {/* Result text for past waypoints (shown next to circle, additional context) */}
       {isPast && result !== null ? (
-        <ThemedText style={[styles.resultIcon, { color: RESULT_COLOR[result] }]}>
-          {RESULT_ICON[result]}
+        <ThemedText style={[styles.resultLabel, { color: RESULT_COLOR[result] }]}>
+          {result}
         </ThemedText>
       ) : (
         <View style={styles.resultPlaceholder} />
@@ -174,7 +188,6 @@ function ScrollRow({
 const styles = StyleSheet.create({
   list: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
   },
   content: {
     paddingVertical: Spacing.four,
@@ -187,15 +200,8 @@ const styles = StyleSheet.create({
     paddingRight: Spacing.three,
     gap: Spacing.two,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#1a1a1a',
   },
-  rowCurrent: {
-    backgroundColor: '#111',
-    paddingVertical: 14,
-  },
-  rowPast: {
-    opacity: 0.45,
-  },
+  // rowPast intentionally removed — past rows are NOT dimmed; result color on circle conveys state
 
   stripe: {
     width: 3,
@@ -207,7 +213,6 @@ const styles = StyleSheet.create({
     width: 28,
     textAlign: 'right',
     fontSize: 12,
-    color: '#555',
     fontVariant: ['tabular-nums'],
   },
 
@@ -235,33 +240,28 @@ const styles = StyleSheet.create({
   },
   labelText: {
     fontSize: 14,
-    color: '#aaa',
     fontWeight: '500',
   },
   labelCurrent: {
-    color: '#fff',
     fontWeight: '700',
     fontSize: 16,
-  },
-  dimText: {
-    color: '#444',
   },
 
   dist: {
     fontSize: 11,
-    color: '#555',
     fontVariant: ['tabular-nums'],
     textAlign: 'right',
     minWidth: 56,
   },
 
-  resultIcon: {
-    fontSize: 16,
-    fontWeight: '700',
-    width: 20,
-    textAlign: 'center',
+  resultLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    width: 52,
+    textAlign: 'right',
   },
   resultPlaceholder: {
-    width: 20,
+    width: 52,
   },
 });

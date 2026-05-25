@@ -4,6 +4,7 @@ import { ThemedText } from '@/components/themed-text';
 import { WaypointSymbol } from '@/components/WaypointSymbol';
 import { Spacing } from '@/constants/theme';
 import { formatStageDuration } from '@/engine/stageTimer';
+import { useTheme } from '@/hooks/use-theme';
 import type { Waypoint } from '@/types';
 
 export interface WaypointCardProps {
@@ -31,15 +32,19 @@ export function WaypointCard({
   odometerKm,
   stageElapsedMs,
 }: WaypointCardProps) {
+  const theme = useTheme();
   const distanceLabel = formatDistance(distanceToCurrentM, distanceUnit);
   const headingLabel = headingDeg !== null ? `${Math.round(headingDeg)}°` : '---';
   const bearingLabel = `${Math.round(bearingToDeg)}°`;
   const odoLabel = formatOdo(odometerKm, distanceUnit);
 
+  const border = { borderBottomColor: theme.backgroundElement };
+  const dividerColor = theme.backgroundElement;
+
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: theme.background }]}>
       {/* Zone 1 — header bar */}
-      <View style={styles.headerBar}>
+      <View style={[styles.headerBar, border]}>
         <ThemedText style={styles.headerCounter}>
           #{currentIndex + 1} / {totalCount}
         </ThemedText>
@@ -64,11 +69,11 @@ export function WaypointCard({
       </View>
 
       {/* Zone 3 — compass bar */}
-      <View style={styles.compassBar}>
+      <View style={[styles.compassBar, { borderTopColor: dividerColor, borderBottomColor: dividerColor }]}>
         <CompassCell icon="↑" label="HDG" value={headingLabel} />
-        <View style={styles.compassDivider} />
+        <View style={[styles.compassDivider, { backgroundColor: dividerColor }]} />
         <CompassCell icon="🧭" label="BRG" value={bearingLabel} />
-        <View style={styles.compassDivider} />
+        <View style={[styles.compassDivider, { backgroundColor: dividerColor }]} />
         <CompassCell icon="📏" label="ODO" value={odoLabel} />
       </View>
 
@@ -118,7 +123,6 @@ function formatDistance(distanceM: number, unit: 'km' | 'mi'): string {
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
   },
 
   // Zone 1
@@ -129,20 +133,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.three,
     borderBottomWidth: 1,
-    borderBottomColor: '#1f1f1f',
   },
   headerCounter: {
     fontSize: 20,
-    color: '#ffffff',
-    fontWeight: '600',
+    fontWeight: '700',
   },
   headerDistance: {
     fontSize: 20,
-    color: '#ffffff',
-    fontWeight: '600',
+    fontWeight: '700',
   },
 
-  // Zone 1b
+  // Zone 1b — stage timer (intentionally high-contrast orange regardless of theme)
   stageBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -178,9 +179,7 @@ const styles = StyleSheet.create({
   compassBar: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    borderTopColor: '#1f1f1f',
     borderBottomWidth: 1,
-    borderBottomColor: '#1f1f1f',
   },
   compassCell: {
     flex: 1,
@@ -190,21 +189,17 @@ const styles = StyleSheet.create({
   },
   compassDivider: {
     width: 1,
-    backgroundColor: '#1f1f1f',
   },
   compassIcon: {
     fontSize: 18,
-    color: '#888',
   },
   compassValue: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#ffffff',
     fontVariant: ['tabular-nums'],
   },
   compassLabel: {
     fontSize: 11,
-    color: '#555',
     letterSpacing: 1,
   },
 
@@ -219,13 +214,11 @@ const styles = StyleSheet.create({
   },
   nextLabel: {
     fontSize: 13,
-    color: '#555',
     letterSpacing: 1,
     fontWeight: '600',
   },
   nextDistance: {
     fontSize: 16,
-    color: '#888',
     marginLeft: 'auto',
   },
 });
