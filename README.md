@@ -58,8 +58,8 @@ npm run web        # browser
 
 Documented in `.env.example`. All app-accessible variables use the `EXPO_PUBLIC_` prefix.
 
-| Variable | Description |
-|----------|-------------|
+| Variable                   | Description                                                   |
+| -------------------------- | ------------------------------------------------------------- |
 | `EXPO_PUBLIC_MAPBOX_TOKEN` | Mapbox GL access token (reserved for Phase 2 map integration) |
 
 ## Building
@@ -141,14 +141,14 @@ Expo resolves `.native.tsx` for iOS/Android and `.web.tsx` for web with the base
 
 ## Screens
 
-| Screen | Route | Description |
-|--------|-------|-------------|
-| Home | `/` | Import a route file; shows up to 5 recent routes |
-| My Routes | `/routes` | Full saved-route library with swipe-to-delete |
-| Settings | `/settings` | Trigger radius (25–200 m), distance unit (km/mi), light/dark/auto theme |
-| Route Preview | `/route/[routeId]` | Auto-generated waypoint list; edit type, delete individual waypoints, start ride |
-| Ride | `/ride/[sessionId]` | Full-screen waypoint card; live GPS proximity detection; SKIP / END RIDE controls; screen kept awake |
-| Session Summary | `/session/[sessionId]` | Elapsed time, distance, pass/miss/skip totals, per-waypoint result list; Ride Again shortcut |
+| Screen          | Route                  | Description                                                                                          |
+| --------------- | ---------------------- | ---------------------------------------------------------------------------------------------------- |
+| Home            | `/`                    | Import a route file; shows up to 5 recent routes                                                     |
+| My Routes       | `/routes`              | Full saved-route library with swipe-to-delete                                                        |
+| Settings        | `/settings`            | Trigger radius (25–200 m), distance unit (km/mi), light/dark/auto theme                              |
+| Route Preview   | `/route/[routeId]`     | Auto-generated waypoint list; edit type, delete individual waypoints, start ride                     |
+| Ride            | `/ride/[sessionId]`    | Full-screen waypoint card; live GPS proximity detection; SKIP / END RIDE controls; screen kept awake |
+| Session Summary | `/session/[sessionId]` | Elapsed time, distance, pass/miss/skip totals, per-waypoint result list; Ride Again shortcut         |
 
 ## Screen Flow
 
@@ -161,16 +161,17 @@ Home
 
 ## Waypoint Types
 
-| Category | Codes |
-|----------|-------|
-| Navigation | `GO KR KL TR TL HR HL UT RB FRK` |
-| Hazard | `CAU-CROSS CAU-ROCK CAU-TRACK CAU-PASS CAU-SLICK CAU-BUMP CAU-ROAD CAU-TRAFFIC` |
-| Special | `CP TC FUEL PARK CAMP SRV MED WPT SS SS-END PHOTO INFO` |
-| Bearing | `HDG DST` |
+| Category   | Codes                                                                           |
+| ---------- | ------------------------------------------------------------------------------- |
+| Navigation | `GO KR KL TR TL HR HL UT RB FRK`                                                |
+| Hazard     | `CAU-CROSS CAU-ROCK CAU-TRACK CAU-PASS CAU-SLICK CAU-BUMP CAU-ROAD CAU-TRAFFIC` |
+| Special    | `CP TC FUEL PARK CAMP SRV MED WPT SS SS-END PHOTO INFO`                         |
+| Bearing    | `HDG DST`                                                                       |
 
 ## Auto-Generation Algorithm (`src/engine/waypointGen.ts`)
 
 For every coordinate triple `[prev, current, next]`:
+
 1. Calculate bearing change (deflection angle)
 2. If `|angle| > 15°` → candidate waypoint
 3. Classify: 15–45° = Keep, 45–90° = Turn, 90–135° = Hard, >135° = U-Turn
@@ -212,4 +213,4 @@ Engine modules (`routeParser`, `waypointGen`, `proximity`) have Jest unit test c
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Copyright (c) 2025 Philipp Goeschl.
+MIT — see [LICENSE](LICENSE). Copyright (c) 2026 Philipp Goeschl.
