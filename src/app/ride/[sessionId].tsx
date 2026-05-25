@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { WaypointCard } from '@/components/WaypointCard';
+import { RoadbookScroll } from '@/components/RoadbookScroll';
 import { getBearingToWaypoint, getDistanceToWaypointM, checkProximity } from '@/engine/proximity';
 import { formatStageDuration } from '@/engine/stageTimer';
 import { useLocation } from '@/hooks/useLocation';
@@ -56,6 +57,7 @@ export default function RideScreen() {
   const [bearingToDeg, setBearingToDeg] = useState(0);
   const [rideFinished, setRideFinished] = useState(false);
   const [penaltyAlert, setPenaltyAlert] = useState<string | null>(null);
+  const [showScroll, setShowScroll] = useState(false);
   const penaltyAlertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // GPS update loop
@@ -184,22 +186,38 @@ export default function RideScreen() {
         </View>
       )}
 
-      {/* Full-screen waypoint card */}
-      <WaypointCard
-        current={currentWaypoint}
-        currentIndex={currentWaypointIndex}
-        totalCount={waypoints.length}
-        next={nextWaypoint}
-        distanceToCurrentM={distanceToCurrentM}
-        headingDeg={heading}
-        bearingToDeg={bearingToDeg}
-        distanceUnit={distanceUnit}
-        odometerKm={odometerKm}
-        stageElapsedMs={isInStage ? stageElapsedMs : null}
-      />
+      {/* Main view — card or scroll */}
+      {showScroll ? (
+        <RoadbookScroll
+          waypoints={waypoints}
+          currentIndex={currentWaypointIndex}
+          events={activeSession.events}
+          distanceUnit={distanceUnit}
+        />
+      ) : (
+        <WaypointCard
+          current={currentWaypoint}
+          currentIndex={currentWaypointIndex}
+          totalCount={waypoints.length}
+          next={nextWaypoint}
+          distanceToCurrentM={distanceToCurrentM}
+          headingDeg={heading}
+          bearingToDeg={bearingToDeg}
+          distanceUnit={distanceUnit}
+          odometerKm={odometerKm}
+          stageElapsedMs={isInStage ? stageElapsedMs : null}
+        />
+      )}
 
       {/* Controls overlay at the bottom */}
       <SafeAreaView style={styles.controls} edges={['bottom']}>
+        <Pressable
+          style={({ pressed }) => [styles.scrollToggle, showScroll && styles.scrollToggleActive, pressed && styles.pressed]}
+          onPress={() => setShowScroll((v) => !v)}>
+          <ThemedText style={[styles.scrollToggleText, showScroll && styles.scrollToggleTextActive]}>
+            {showScroll ? 'CARD' : 'SCROLL'}
+          </ThemedText>
+        </Pressable>
         <Pressable
           style={({ pressed }) => [styles.skipButton, pressed && styles.pressed]}
           onPress={handleSkip}>
@@ -229,6 +247,30 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#1f1f1f',
   },
+  scrollToggle: {
+    backgroundColor: '#1f1f1f',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    minHeight: 56,
+    justifyContent: 'center',
+  },
+  scrollToggleActive: {
+    backgroundColor: '#1a2a1a',
+    borderWidth: 1,
+    borderColor: '#38A169',
+  },
+  scrollToggleText: {
+    color: '#555',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+  },
+  scrollToggleTextActive: {
+    color: '#38A169',
+  },
+
   skipButton: {
     flex: 1,
     backgroundColor: '#1f1f1f',
