@@ -1,6 +1,6 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -20,8 +20,12 @@ import type { Route } from '@/types';
 export default function HomeScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const { routes, isLoading, importRoute } = useRouteStore();
+  const { routes, isLoading, loadRoutes, importRoute } = useRouteStore();
   const [importing, setImporting] = useState(false);
+
+  useEffect(() => {
+    if (routes.length === 0) loadRoutes();
+  }, []);
   const [importError, setImportError] = useState<string | null>(null);
 
   async function handleImport() {

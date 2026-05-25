@@ -1,29 +1,35 @@
 import * as SQLite from 'expo-sqlite';
 import type { Route, Waypoint, Session, SessionEvent } from '@/types';
 
-let _db: SQLite.SQLiteDatabase | null = null;
+let _dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
-export async function getDb(): Promise<SQLite.SQLiteDatabase> {
-  if (_db) return _db;
-  _db = await SQLite.openDatabaseAsync('roadbook.db');
-  await _db.execAsync('PRAGMA journal_mode = WAL;');
-  await _db.execAsync('PRAGMA foreign_keys = ON;');
-  await runMigrations(_db);
-  return _db;
+export function getDb(): Promise<SQLite.SQLiteDatabase> {
+  if (!_dbPromise) {
+    _dbPromise = (async () => {
+      const db = await SQLite.openDatabaseAsync('roadbook.db');
+      // WAL mode is not supported in the browser's sandboxed filesystem; ignore the error on web.
+      try { await db.execAsync('PRAGMA journal_mode = WAL;'); } catch {}
+      await db.execAsync('PRAGMA foreign_keys = ON;');
+      await runMigrations(db);
+      return db;
+    })();
+  }
+  return _dbPromise;
 }
 
 async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
-  await db.execAsync(`
-    CREATE TABLE IF NOT EXISTS routes (
+  await db.execAsync(
+    `CREATE TABLE IF NOT EXISTS routes (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       description TEXT,
       total_distance_km REAL NOT NULL DEFAULT 0,
       geo_json TEXT NOT NULL,
       created_at INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS waypoints (
+    )`,
+  );
+  await db.execAsync(
+    `CREATE TABLE IF NOT EXISTS waypoints (
       id TEXT PRIMARY KEY,
       route_id TEXT NOT NULL REFERENCES routes(id) ON DELETE CASCADE,
       idx INTEGER NOT NULL,
@@ -35,19 +41,22 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       trigger_radius_m REAL NOT NULL DEFAULT 50,
       mandatory INTEGER NOT NULL DEFAULT 0,
       note TEXT
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_waypoints_route ON waypoints(route_id, idx);
-
-    CREATE TABLE IF NOT EXISTS sessions (
+    )`,
+  );
+  await db.execAsync(
+    'CREATE INDEX IF NOT EXISTS idx_waypoints_route ON waypoints(route_id, idx)',
+  );
+  await db.execAsync(
+    `CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       route_id TEXT NOT NULL REFERENCES routes(id),
       started_at INTEGER NOT NULL,
       ended_at INTEGER,
       total_distance_km REAL NOT NULL DEFAULT 0
-    );
-
-    CREATE TABLE IF NOT EXISTS session_events (
+    )`,
+  );
+  await db.execAsync(
+    `CREATE TABLE IF NOT EXISTS session_events (
       id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
       waypoint_id TEXT NOT NULL,
@@ -55,10 +64,11 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       ts INTEGER NOT NULL,
       lat REAL NOT NULL,
       lng REAL NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_events_session ON session_events(session_id);
-  `);
+    )`,
+  );
+  await db.execAsync(
+    'CREATE INDEX IF NOT EXISTS idx_events_session ON session_events(session_id)',
+  );
 }
 
 // ─── Route repo ────────────────────────────────────────────────────────────────

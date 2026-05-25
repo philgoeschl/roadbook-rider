@@ -55,7 +55,7 @@ export default function RideScreen() {
 
   const [distanceToCurrentM, setDistanceToCurrentM] = useState(0);
   const [bearingToDeg, setBearingToDeg] = useState(0);
-  const [rideFinished, setRideFinished] = useState(false);
+  const rideFinishedRef = useRef(false);
   const [penaltyAlert, setPenaltyAlert] = useState<string | null>(null);
   const [showScroll, setShowScroll] = useState(false);
   const penaltyAlertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -124,8 +124,8 @@ export default function RideScreen() {
   }, [location]);
 
   async function handleFinish() {
-    if (rideFinished) return;
-    setRideFinished(true);
+    if (rideFinishedRef.current) return;
+    rideFinishedRef.current = true;
     await endSession(odometerKm);
     router.replace(`/session/${sessionId}`);
   }

@@ -8,13 +8,13 @@ import { ThemedView } from '@/components/themed-view';
 import { WAYPOINT_LABEL } from '@/components/WaypointSymbol';
 import { Spacing, WaypointColors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { sessionRepo } from '@/db/schema';
+import { sessionRepo, routeRepo } from '@/db/schema';
 import { computePenalty } from '@/engine/penalty';
 import { computeStageStatus, formatStageDuration } from '@/engine/stageTimer';
 import { useRouteStore } from '@/store/routeStore';
 import { useSessionStore } from '@/store/sessionStore';
 import { useSettingsStore } from '@/store/settingsStore';
-import type { Session, Waypoint } from '@/types';
+import type { Route, Session, Waypoint } from '@/types';
 
 export default function SessionSummaryScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
@@ -25,12 +25,21 @@ export default function SessionSummaryScreen() {
   const { penaltyPerMissMs } = useSettingsStore();
 
   const [session, setSession] = useState<Session | null>(null);
+  const [route, setRoute] = useState<Route | null>(null);
 
   useEffect(() => {
     sessionRepo.getSession(sessionId).then(setSession);
   }, [sessionId]);
 
-  const route = routes.find((r) => r.id === session?.routeId) ?? null;
+  useEffect(() => {
+    if (!session) return;
+    const fromStore = routes.find((r) => r.id === session.routeId) ?? null;
+    if (fromStore) {
+      setRoute(fromStore);
+    } else {
+      routeRepo.getRoute(session.routeId).then(setRoute);
+    }
+  }, [session, routes]);
 
   if (!session || !route) {
     return (
