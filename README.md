@@ -2,22 +2,25 @@
 
 A React Native (Expo) app that turns any GPS route into a rally-raid-style navigation experience. Instead of turn-by-turn voice guidance, riders follow a sequence of visual waypoint cards — just like a Dakar stage. Miss a mandatory checkpoint, earn a penalty.
 
-> **Status:** Early development — see `docs/ROADBOOK_RIDER_plan.md` for the full design spec.
+> **Status:** Phase 1 MVP complete — core ride flow works end-to-end. See `docs/ROADBOOK_RIDER_plan.md` for the full design spec.
 
 ## Concept
 
-Import a GPX/KML/GeoJSON route (or paste coordinates) and the app automatically generates waypoint cards from the route geometry: turns, forks, hazards, checkpoints. During a ride the screen shows one large, glove-friendly card at a time. GPS proximity detection auto-advances to the next waypoint and flags missed ones.
+Import a GPX/KML/GeoJSON route and the app automatically generates waypoint cards from the route geometry: turns, forks, hazards, checkpoints. During a ride the screen shows one large, glove-friendly card at a time. GPS proximity detection auto-advances to the next waypoint and flags missed ones.
 
 ## Tech Stack
 
-- **Expo + React Native** — cross-platform mobile (iOS, Android, Web)
-- **Expo Router** — file-based screen routing
-- **Mapbox GL** — map rendering + offline tile packs
-- **expo-location** — foreground & background GPS tracking
+- **Expo 56 + React Native 0.85** — cross-platform mobile (iOS, Android, Web)
+- **Expo Router** — file-based screen routing (`src/app/`)
+- **expo-location** — foreground GPS tracking
+- **expo-document-picker / expo-file-system** — GPX/KML/GeoJSON file import
+- **fast-xml-parser** — GPX and KML parsing
 - **Turf.js** — geospatial analysis (bearing, distance, fork detection)
 - **expo-sqlite** — local storage for routes and sessions
 - **Zustand** — lightweight state management
-- **TypeScript** — strict mode
+- **TypeScript** (strict mode)
+
+> Mapbox GL is planned for Phase 2 map overlays but not yet integrated.
 
 ## Getting Started
 
@@ -25,7 +28,6 @@ Import a GPX/KML/GeoJSON route (or paste coordinates) and the app automatically 
 
 - Node.js 18+
 - Expo Go on device, or iOS Simulator (Xcode) / Android Emulator (Android Studio)
-- A [Mapbox access token](https://www.mapbox.com/) (free tier available)
 
 ### Install
 
@@ -39,12 +41,6 @@ npm install
 
 ```bash
 cp .env.example .env
-```
-
-Edit `.env` and set your Mapbox token:
-
-```
-EXPO_PUBLIC_MAPBOX_TOKEN=pk.your_token_here
 ```
 
 `.env` is gitignored. Never commit it.
@@ -64,9 +60,7 @@ Documented in `.env.example`. All app-accessible variables use the `EXPO_PUBLIC_
 
 | Variable | Description |
 |----------|-------------|
-| `EXPO_PUBLIC_MAPBOX_TOKEN` | Mapbox GL access token — required for map tiles |
-
-After editing `.env`, restart the dev server.
+| `EXPO_PUBLIC_MAPBOX_TOKEN` | Mapbox GL access token (reserved for Phase 2 map integration) |
 
 ## Building
 
@@ -101,30 +95,68 @@ Profiles defined in `eas.json`: **development** (dev client, internal), **previe
 ## Project Structure
 
 ```
-app/                      # Expo Router screens
-  (tabs)/                 # Tab nav: Home, My Routes, Settings
-  ride/[sessionId].tsx    # Active ride — full-screen waypoint card
-  route/[routeId].tsx     # Route preview & waypoint editor
 src/
-  engine/                 # Pure logic, no UI dependencies
-    routeParser.ts        # GPX / KML / GeoJSON → Route
-    waypointGen.ts        # Auto-generates waypoints from geometry
-    proximity.ts          # GPS proximity → PASSED / MISSED events
-    odometer.ts           # Trip computer
+  app/                      # Expo Router screens
+    (tabs)/
+      index.tsx             # Home: import button + recent routes list
+      routes.tsx            # My Routes: full library with delete
+      settings.tsx          # Settings: trigger radius, units, theme
+    ride/[sessionId].tsx    # Active ride — full-screen waypoint card + GPS loop
+    route/[routeId].tsx     # Route preview + waypoint editor
+    session/[sessionId].tsx # Post-ride summary: stats, pass/miss/skip per waypoint
   components/
-    WaypointCard/         # Full-screen high-contrast card
-    WaypointSymbol/       # SVG icon per waypoint type
-    RoadbookScroll/       # Vertical tape-style waypoint list
-    MiniMap/              # Contextual map overlay
+    WaypointCard/           # Full-screen high-contrast card (primary ride UI)
+    WaypointSymbol/         # Icon + label renderer per waypoint type
+  engine/                   # Pure logic, no UI dependencies
+    routeParser.ts          # GPX / KML / GeoJSON → Route
+    waypointGen.ts          # Auto-generates waypoints from route geometry
+    proximity.ts            # GPS proximity → PASSED / MISSED / SKIPPED events
+    odometer.ts             # Trip computer
   store/
-    routeStore.ts         # Zustand: loaded routes, active route
-    sessionStore.ts       # Zustand: active session, events, penalties
+    routeStore.ts           # Zustand: loaded routes, import, update, delete
+    sessionStore.ts         # Zustand: active session, events, waypoint index
+    settingsStore.ts        # Zustand: trigger radius, distance unit, theme
   db/
-    schema.ts             # SQLite schema
+    schema.ts               # SQLite schema + repository helpers
   types/
-    index.ts              # Route, Waypoint, Session interfaces
+    index.ts                # Route, Waypoint, Session, AppSettings interfaces
+  constants/
+    theme.ts                # Colors (light/dark), spacing
+  hooks/
+    useLocation.ts          # expo-location wrapper (GPS + heading + permission)
+    use-theme.ts            # Active theme colors
+__tests__/
+  engine/
+    routeParser.test.ts
+    waypointGen.test.ts
+    proximity.test.ts
 assets/
-  waypoint-symbols/       # SVG icons for each WaypointType code
+  images/                   # App icons, splash
+  waypoint-symbols/         # SVG icons for each WaypointType code
+```
+
+### Platform-Specific Files
+
+Expo resolves `.native.tsx` for iOS/Android and `.web.tsx` for web with the base `.tsx` as fallback.
+
+## Screens
+
+| Screen | Route | Description |
+|--------|-------|-------------|
+| Home | `/` | Import a route file; shows up to 5 recent routes |
+| My Routes | `/routes` | Full saved-route library with swipe-to-delete |
+| Settings | `/settings` | Trigger radius (25–200 m), distance unit (km/mi), light/dark/auto theme |
+| Route Preview | `/route/[routeId]` | Auto-generated waypoint list; edit type, delete individual waypoints, start ride |
+| Ride | `/ride/[sessionId]` | Full-screen waypoint card; live GPS proximity detection; SKIP / END RIDE controls; screen kept awake |
+| Session Summary | `/session/[sessionId]` | Elapsed time, distance, pass/miss/skip totals, per-waypoint result list; Ride Again shortcut |
+
+## Screen Flow
+
+```
+Home
+  ├─ Import Route → Route Preview + Waypoint Editor → Start Ride → Ride Screen → Session Summary
+  ├─ My Routes → Route Preview
+  └─ Settings
 ```
 
 ## Waypoint Types
@@ -136,10 +168,46 @@ assets/
 | Special | `CP TC FUEL PARK CAMP SRV MED WPT SS SS-END PHOTO INFO` |
 | Bearing | `HDG DST` |
 
+## Auto-Generation Algorithm (`src/engine/waypointGen.ts`)
+
+For every coordinate triple `[prev, current, next]`:
+1. Calculate bearing change (deflection angle)
+2. If `|angle| > 15°` → candidate waypoint
+3. Classify: 15–45° = Keep, 45–90° = Turn, 90–135° = Hard, >135° = U-Turn
+4. Detect forks where 2+ forward paths exist
+5. Insert mandatory waypoints at route start/end and tagged POIs from the source file
+6. Merge waypoints closer than 100 m (keep highest-priority type)
+7. Assign sequential index and compute inter-waypoint distances
+
+## Ride Screen Layout
+
+```
+┌─────────────────────────────┐
+│  #7 / 34          3.2 km ➡  │  ← waypoint counter + distance
+├─────────────────────────────┤
+│       [WAYPOINT SYMBOL]     │
+│         HARD RIGHT          │
+├─────────────────────────────┤
+│  ↑ N  47°   🧭  215°  2.1km │  ← current heading / bearing to WP
+├─────────────────────────────┤
+│  NEXT: ↑ GO  (1.8 km)       │
+└─────────────────────────────┘
+```
+
+## Tests
+
+```bash
+npm test                              # run all unit tests
+npm test -- --watch                   # watch mode
+npm test -- __tests__/engine/foo.test.ts  # single file
+```
+
+Engine modules (`routeParser`, `waypointGen`, `proximity`) have Jest unit test coverage.
+
 ## Roadmap
 
-- **Phase 1 (MVP):** Route import, auto waypoint generation, manual editor, live GPS + proximity detection, session log
-- **Phase 2:** Roadbook scroll view, odometer, stage timing, penalty system, PDF export, route sharing
+- **Phase 1 (MVP) — done:** Route import (GPX/KML/GeoJSON), auto waypoint generation, manual editor, live GPS proximity detection, session log with pass/miss/skip summary
+- **Phase 2:** Roadbook scroll view, odometer, stage timing, penalty system, Mapbox map overlay, PDF export, route sharing
 - **Phase 3:** Community waypoint packs, photo evidence at checkpoints, wearable companion (Watch/WearOS), Bluetooth handlebar display
 
 ## License
